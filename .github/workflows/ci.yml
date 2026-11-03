@@ -17,7 +17,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             valac meson ninja-build libgtk-3-dev libx11-dev libxtst-dev \
-            libatspi2.0-dev python3 desktop-file-utils debhelper dpkg-dev
+            libatspi2.0-dev python3 desktop-file-utils debhelper dpkg-dev \
+            build-essential
 
       - name: Build and test
         run: |
