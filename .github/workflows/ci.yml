@@ -6,6 +6,9 @@ on:
     tags: ['v*']
   pull_request:
 
+permissions:
+  contents: write   # needed to attach the .deb to tagged releases
+
 jobs:
   build:
     runs-on: ubuntu-24.04
