@@ -3,9 +3,14 @@ Type=Application
 Name=Emozi
 GenericName=Emoji Picker
 Comment=Search and insert emoji into any app
-Exec=emozi --toggle
+Exec=emozi --preferences
 Icon=io.github.maskedsyntax.Emozi
 Terminal=false
 Categories=Utility;GTK;
 Keywords=emoji;emoticon;smiley;picker;character;symbol;
 StartupNotify=false
+Actions=open-picker;
+
+[Desktop Action open-picker]
+Name=Open Emoji Picker
+Exec=emozi --show

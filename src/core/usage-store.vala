@@ -161,6 +161,17 @@ public class Emozi.UsageStore : Object {
         return result;
     }
 
+    /* Forget usage history (skin-tone choices are kept). */
+    public void clear_history () {
+        try {
+            if (kf.has_group (USAGE)) {
+                kf.remove_group (USAGE);
+            }
+        } catch (Error e) {
+        }
+        save ();
+    }
+
     private void save () {
         if (path == null) {
             return;

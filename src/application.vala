@@ -14,6 +14,8 @@ public class Emozi.Application : Gtk.Application {
     private uint regrab_source = 0;
     private bool hotkey_ok = false;
     private int64 dismissed_at = 0;
+    private ulong keymap_handler = 0;
+    private PreferencesWindow? prefs = null;
 
     public Application () {
         Object (application_id: BuildConfig.APP_ID,
@@ -25,6 +27,8 @@ public class Emozi.Application : Gtk.Application {
                          "Show the picker", null);
         add_main_option ("background", 'b', OptionFlags.NONE, OptionArg.NONE,
                          "Start in the background without showing the picker", null);
+        add_main_option ("preferences", 'p', OptionFlags.NONE, OptionArg.NONE,
+                         "Open the preferences window", null);
         add_main_option ("quit", 'q', OptionFlags.NONE, OptionArg.NONE,
                          "Quit the running instance", null);
         add_main_option ("version", 'v', OptionFlags.NONE, OptionArg.NONE,
@@ -91,18 +95,17 @@ public class Emozi.Application : Gtk.Application {
         }
         if (opts.contains ("background")) {
             if (hotkey_ok) {
-                uint key;
-                Gdk.ModifierType mods;
-                Gtk.accelerator_parse (config.hotkey, out key, out mods);
                 cmd.print ("Emozi is running in the background. Press %s to open the picker.\n",
-                           Gtk.accelerator_get_label (key, mods));
+                           hotkey_label);
             } else {
                 cmd.print ("Emozi is running, but the shortcut could not be set up (see the " +
                            "warning above). Use `emozi --toggle` to open the picker.\n");
             }
             return 0;
         }
-        if (opts.contains ("show")) {
+        if (opts.contains ("preferences")) {
+            show_preferences ();
+        } else if (opts.contains ("show")) {
             show_picker (Gdk.CURRENT_TIME);
         } else {
             toggle (Gdk.CURRENT_TIME);
@@ -116,64 +119,110 @@ public class Emozi.Application : Gtk.Application {
 
     /* ---------- hotkey ---------- */
 
-    /* Absolute command that toggles this binary's picker. */
-    private static string toggle_command () {
-        string exe;
+    /* Absolute path of this binary, so shortcuts/autostart run this copy. */
+    public static string executable_path () {
         try {
-            exe = FileUtils.read_link ("/proc/self/exe");
+            return FileUtils.read_link ("/proc/self/exe");
         } catch (Error e) {
-            exe = "emozi";
+            return "emozi";
         }
-        return Shell.quote (exe) + " --toggle";
     }
 
-    private void setup_hotkey () {
+    public string hotkey_label {
+        owned get {
+            uint key;
+            Gdk.ModifierType mods;
+            Gtk.accelerator_parse (config.hotkey, out key, out mods);
+            return Gtk.accelerator_get_label (key, mods);
+        }
+    }
+
+    /* Bind `accel` with whatever mechanism this desktop needs. Throws with a
+     * user-presentable message on failure; the previous binding stays. */
+    private void register_hotkey (string accel) throws Error {
         /* Cinnamon swallows Super+<key> for its menu, so let the shell own
          * the binding there; it then runs `emozi --toggle`. */
         if (CinnamonShortcut.available ()) {
-            try {
-                CinnamonShortcut.register (config.hotkey, toggle_command ());
-                debug ("Hotkey %s registered as a Cinnamon custom shortcut", config.hotkey);
-                hotkey_ok = true;
-                return;
-            } catch (Error e) {
-                warning ("Could not register the Cinnamon shortcut: %s", e.message);
-                return;
-            }
-        }
-
-        if (!is_x11) {
-            message ("Not an X11 session: bind a shortcut to `emozi --toggle` in your " +
-                     "desktop's keyboard settings.");
+            CinnamonShortcut.register (accel, Shell.quote (executable_path ()) + " --toggle");
+            debug ("Hotkey %s registered as a Cinnamon custom shortcut", accel);
             return;
         }
+        if (!is_x11) {
+            throw new IOError.NOT_SUPPORTED (
+                "Global shortcuts are not supported in this session yet. Bind " +
+                "“emozi --toggle” in your desktop's keyboard settings instead.");
+        }
+        X11.hotkey_grab (accel, on_hotkey);
+        debug ("Hotkey %s grabbed", accel);
+        if (keymap_handler == 0) {
+            /* Keycodes change with the keyboard layout; re-grab (debounced).
+             * Our own synthetic typing also triggers this, harmlessly. */
+            var keymap = Gdk.Keymap.get_for_display (Gdk.Display.get_default ());
+            keymap_handler = keymap.keys_changed.connect (() => {
+                if (regrab_source != 0) {
+                    Source.remove (regrab_source);
+                }
+                regrab_source = Timeout.add (500, () => {
+                    regrab_source = 0;
+                    if (hotkey_ok && !hotkey_suspended) {
+                        try {
+                            X11.hotkey_grab (config.hotkey, on_hotkey);
+                        } catch (Error e) {
+                            warning ("Re-grabbing hotkey failed: %s", e.message);
+                        }
+                    }
+                    return Source.REMOVE;
+                });
+            });
+        }
+    }
+
+    private void setup_hotkey () {
         try {
-            X11.hotkey_grab (config.hotkey, on_hotkey);
-            debug ("Hotkey %s registered", config.hotkey);
+            register_hotkey (config.hotkey);
             hotkey_ok = true;
         } catch (Error e) {
-            warning ("%s. Set another \"hotkey\" in %s, or bind `emozi --toggle` in " +
-                     "your desktop's keyboard settings.", e.message,
-                     Path.build_filename (Environment.get_user_config_dir (), "emozi", "config.ini"));
+            warning ("Shortcut %s: %s", config.hotkey, e.message);
+        }
+    }
+
+    /* Used by the preferences window. On success the new shortcut is saved. */
+    public void change_hotkey (string accel) throws Error {
+        if (accel == config.hotkey && hotkey_ok) {
             return;
         }
+        register_hotkey (accel);
+        config.hotkey = accel;
+        config.save ();
+        hotkey_ok = true;
+    }
 
-        /* Keycodes change with the keyboard layout; re-grab (debounced). Our
-         * own synthetic typing also triggers this, which is harmless. */
-        Gdk.Keymap.get_for_display (Gdk.Display.get_default ()).keys_changed.connect (() => {
-            if (regrab_source != 0) {
-                Source.remove (regrab_source);
+    /* While the preferences window records a new shortcut, the current one
+     * must not open the picker (or, on X11, swallow the key press). */
+    public bool hotkey_suspended {
+        get { return _hotkey_suspended; }
+        set {
+            if (_hotkey_suspended == value) {
+                return;
             }
-            regrab_source = Timeout.add (500, () => {
-                regrab_source = 0;
-                try {
-                    X11.hotkey_grab (config.hotkey, on_hotkey);
-                } catch (Error e) {
-                    warning ("Re-grabbing hotkey failed: %s", e.message);
+            _hotkey_suspended = value;
+            if (is_x11 && !CinnamonShortcut.available () && hotkey_ok) {
+                if (value) {
+                    X11.hotkey_ungrab ();
+                } else {
+                    try {
+                        X11.hotkey_grab (config.hotkey, on_hotkey);
+                    } catch (Error e) {
+                        warning ("Re-grabbing hotkey failed: %s", e.message);
+                    }
                 }
-                return Source.REMOVE;
-            });
-        });
+            }
+        }
+    }
+    private bool _hotkey_suspended = false;
+
+    public bool hotkey_registered {
+        get { return hotkey_ok; }
     }
 
     private void on_hotkey (uint32 timestamp) {
@@ -181,10 +230,34 @@ public class Emozi.Application : Gtk.Application {
         toggle (timestamp);
     }
 
+    /* ---------- preferences ---------- */
+
+    public void show_preferences (uint32 timestamp = Gdk.CURRENT_TIME) {
+        if (prefs == null) {
+            prefs = new PreferencesWindow (this, config, usage);
+            prefs.destroy.connect (() => {
+                prefs = null;
+                hotkey_suspended = false;
+            });
+        }
+        if (timestamp == Gdk.CURRENT_TIME && is_x11) {
+            prefs.realize ();
+            timestamp = X11.get_server_time (prefs.get_window ());
+        }
+        prefs.present_with_time (timestamp);
+    }
+
+    /* Called when "Open near the text cursor" is switched on at runtime. */
+    public void ensure_caret_tracker () {
+        if (caret == null && config.position_at_caret) {
+            caret = new CaretTracker ();
+        }
+    }
+
     /* ---------- show / hide ---------- */
 
     private void toggle (uint32 timestamp) {
-        if (picker == null) {
+        if (picker == null || hotkey_suspended) {
             return;
         }
         if (picker.visible) {

@@ -20,9 +20,11 @@ emozi_sources = core_sources + files(
   'ui/category-bar.vala',
   'ui/variant-popover.vala',
   'ui/picker-window.vala',
+  'ui/preferences-window.vala',
   'platform/caret-tracker.vala',
   'platform/positioner.vala',
   'platform/cinnamon-shortcut.vala',
+  'platform/autostart.vala',
   'platform/emozi-x11.vapi',
 )
 

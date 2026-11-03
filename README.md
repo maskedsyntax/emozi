@@ -30,21 +30,36 @@ Try it without installing:
 
 ### Install
 
+**Debian / Ubuntu / Linux Mint (.deb):**
+
 ```sh
-meson setup build --prefix=/usr/local --buildtype=release   # or --reconfigure
-ninja -C build
-sudo ninja -C build install
-emozi --background        # start now; afterwards it starts at every login
+sudo apt install debhelper           # once, for packaging tools
+./build-aux/build-deb.sh             # builds dist/emozi_<version>_<arch>.deb
+sudo apt install ./dist/emozi_*.deb
+emozi --background                   # start now; it starts at every login after this
 ```
 
-This installs `/usr/local/bin/emozi`, a menu entry, and an autostart entry
-in `/etc/xdg/autostart`. You can turn autostart off in *Startup
-Applications*. On Cinnamon, the shortcut is registered as a custom
-keyboard shortcut named "Emozi". If the service isn't running, pressing the
-shortcut starts it and opens the picker.
+CI builds the `.deb` on every push, and tagged releases (`v*`) have it
+attached.
 
-To remove Emozi, run `sudo ninja -C build uninstall`, then delete the
-"Emozi" entry under Keyboard → Shortcuts → Custom.
+**From source:**
+
+```sh
+meson setup build --prefix=/usr/local --buildtype=release
+ninja -C build
+sudo ninja -C build install
+```
+
+The install includes an autostart entry in `/etc/xdg/autostart`, and
+launching *Emozi* from the menu opens **Preferences**. There you can change
+the shortcut and the other options, or turn off starting at login. On
+Cinnamon, the shortcut is registered as a custom keyboard shortcut named
+"Emozi". If the service isn't running, pressing the shortcut starts it and
+opens the picker.
+
+To uninstall, run `sudo apt remove emozi` (or `sudo ninja -C build
+uninstall`), then delete the "Emozi" entry under Keyboard → Shortcuts →
+Custom.
 
 ## Keys
 
@@ -58,7 +73,8 @@ To remove Emozi, run `sudo ninja -C build uninstall`, then delete the
 
 ## Configuration
 
-`~/.config/emozi/config.ini`:
+Use the Preferences window (`emozi --preferences`, or *Emozi* in the menu).
+The settings are stored in `~/.config/emozi/config.ini`:
 
 ```ini
 [general]
@@ -69,7 +85,8 @@ default-skin-tone=0           # 0 = yellow, 1–5 = light…dark
 frequent-rows=2
 ```
 
-Restart the service (`emozi --quit; emozi --background`) after editing.
+If you edit the file by hand, restart the service afterwards
+(`emozi --quit; emozi --background`).
 
 ## How insertion works
 

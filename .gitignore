@@ -1,2 +1,10 @@
 build/
 *.swp
+dist/
+obj-*/
+debian/.debhelper/
+debian/emozi/
+debian/files
+debian/*.substvars
+debian/*.debhelper.log
+debian/debhelper-build-stamp

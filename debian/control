@@ -1,0 +1,35 @@
+Source: emozi
+Section: utils
+Priority: optional
+Maintainer: Aftaab Siddiqui <aftaab@aftaab.dev>
+Build-Depends: debhelper-compat (= 13),
+               meson (>= 0.62),
+               valac,
+               libglib2.0-dev (>= 2.66),
+               libgtk-3-dev (>= 3.24),
+               libx11-dev,
+               libxtst-dev,
+               libatspi2.0-dev,
+               python3,
+               desktop-file-utils
+Standards-Version: 4.6.2
+Homepage: https://github.com/maskedsyntax/emozi
+Vcs-Git: https://github.com/maskedsyntax/emozi.git
+Vcs-Browser: https://github.com/maskedsyntax/emozi
+Rules-Requires-Root: no
+
+Package: emozi
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Recommends: fonts-noto-color-emoji, at-spi2-core
+Description: macOS-style emoji picker for Linux desktops
+ Emozi opens a small, native-looking emoji picker when you press Super+.
+ Start typing to search by name, keyword or :shortcode:, then press Enter
+ to type the emoji straight into the application you were using.
+ .
+ Features:
+  - all Unicode 17.0 emoji, filtered to what your fonts can display
+  - opens next to the text cursor (via AT-SPI) or at the mouse pointer
+  - frequently used emoji and per-emoji skin-tone memory
+  - follows the GTK theme, light or dark
+  - configurable shortcut, registered with Cinnamon's keyboard settings

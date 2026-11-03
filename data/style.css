@@ -33,3 +33,13 @@ button.emozi-variant {
   min-width: 36px;
   min-height: 36px;
 }
+
+.emozi-preferences .emozi-subtitle {
+  font-size: smaller;
+}
+
+.emozi-preferences radiobutton.emozi-tone,
+.emozi-preferences button.emozi-tone {
+  font-size: 16px;
+  padding: 2px 6px;
+}
