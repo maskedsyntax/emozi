@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Emozi
+GenericName=Emoji Picker
+Comment=Search and insert emoji into any app
+Exec=emozi --toggle
+Icon=io.github.maskedsyntax.Emozi
+Terminal=false
+Categories=Utility;GTK;
+Keywords=emoji;emoticon;smiley;picker;character;symbol;
+StartupNotify=false
